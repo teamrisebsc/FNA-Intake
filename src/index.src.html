@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>FNA Intake</title>
+<meta name="theme-color" content="#eef2f2">
+<link rel="icon" href="data:image/svg+xml;base64,/*@@ICON@@*/">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Source+Serif+4:ital,opsz,wght@0,8..60,500;0,8..60,600;1,8..60,400;1,8..60,500&display=swap" rel="stylesheet">
+<style>/*@@CSS@@*/</style>
+</head>
+<body>
+<div class="bgx" aria-hidden="true"><i class="b1"></i><i class="b2"></i><i class="b3"></i></div><div class="grain" aria-hidden="true"></div><div class="prog" id="prog"></div>
+
+<header class="top">
+  <div class="brand">/*@@LOGO@@*/<div><h1>FNA <em>Intake</em></h1><div class="sub">Team RISE</div></div></div>
+  <div class="who-chip"><span class="save-dot" id="saveDot" title="Saved on this device"></span><b id="whoName">New client</b></div>
+  <div class="grow"></div>
+  <button class="btn ghost" id="findBtn" title="Find any box (Ctrl or Cmd + K)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="lbl-hide">Find a box</span><span class="kbd lbl-hide">&#8984;K</span></button>
+  <button class="btn ghost mobile-math" id="mathBtn">The math</button>
+  <button class="btn ghost" id="clientsBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 19v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1"/><circle cx="9" cy="7" r="3.5"/><path d="M22 19v-1a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg><span class="lbl-keep">Clients</span></button>
+  <button class="btn" id="newBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg><span class="lbl-hide">New</span></button>
+  <button class="btn ghost" id="openBtn" title="Load answers from a filled FNA Intake PDF"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h16M12 4v11M7 10l5 5 5-5"/></svg><span class="lbl-hide">Open PDF</span></button>
+  <input type="file" id="pdfFile" accept="application/pdf,.pdf" hidden>
+  <button class="btn" id="pvBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span class="lbl-hide">Preview PDF</span></button>
+  <button class="btn" id="rptBtn" hidden title="Open this client in the FNA Report app"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16M8 15l4-4 3 3 5-6"/></svg><span class="lbl-hide">Build report</span></button>
+  <button class="btn primary" id="dlBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 4v12M6 11l6 6 6-6M4 20h16"/></svg><span class="lbl-hide">Download PDF</span></button>
+</header>
+
+<div class="shell">
+  <nav class="nav" id="nav"></nav>
+  <main class="main" id="main"></main>
+  <aside class="rail" id="rail">
+    <div class="card" id="math"></div>
+    <div class="card" id="math3"></div>
+    <div class="card" id="math2"></div>
+    <div class="card"><h4>Captured <i>latest first</i></h4><div class="log" id="log"></div></div>
+  </aside>
+</div>
+
+<div class="dock">
+  <div class="dock-in">
+    <div class="spk" id="spk" title="Who is talking (Option + S)"><button type="button" data-w="p" class="on"><i></i><span>Prospect</span></button><button type="button" data-w="s"><i></i><span>Spouse</span></button></div>
+    <input id="cap" autocomplete="off" spellcheck="false" placeholder='Type in additional details here' aria-label="Quick capture">
+    <button class="go" id="capGo" title="Drop it in (Enter)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+  </div>
+  <div class="preview" id="pv"></div>
+  <div class="hints"><span><span class="kbd">/</span> type what you hear</span><span><span class="kbd">&#8997; S</span> switch who is talking</span><span><span class="kbd">;</span> several facts at once</span><span><span class="kbd">&#8984;K</span> find any box</span></div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+<button type="button" class="padbtn" id="padBtn" title="Notes (Option + N)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>Notes<i class="dot"></i></button>
+<div class="pad" id="pad" role="dialog" aria-label="Notes">
+  <header><b>Notes</b><span class="who" id="padWho"></span><button type="button" class="x" id="padX" title="Close (Esc)">&times;</button></header>
+  <textarea id="padTxt" spellcheck="true" placeholder="Type anything you hear. It shows up in Notes at the end of the intake and prints on the PDF."></textarea>
+  <footer><span class="tip">Same notes as section 10</span><button type="button" class="btn sm ghost" id="padGo">Go to Notes</button></footer>
+</div>
+<div class="veil" id="veil"></div>
+<div class="palette" id="pal"><input id="palIn" placeholder="Find a box... try &quot;spouse 401k&quot; or &quot;mortgage&quot;" autocomplete="off"><div class="res" id="palRes"></div></div>
+<aside class="drawer" id="drawer">
+  <header><h3>Clients</h3><button class="btn sm ghost" id="closeDrawer">Close</button></header>
+  <div class="list" id="clientList"></div>
+  <div class="foot2">Saved in this browser on this device only.</div>
+</aside>
+
+<script>/*@@PDFLIB@@*/</script>
+<script>window.__FNA_PDF__="/*@@PDF@@*/";</script>
+<script>/*@@SCHEMA@@*/</script>
+<script>/*@@FILL@@*/</script>
+<script>/*@@CAPTURE@@*/</script>
+<script>/*@@APP@@*/</script>
+</body>
+</html>
