@@ -10,6 +10,7 @@ The October 2026 FNA Intake Sheet as a Team RISE web app. One file: `index.html`
 - Extras on screen only: protection gap, total debt, monthly payments, saved for retirement.
 - Download PDF fills the ORIGINAL form (same fields, same scripts). Acrobat math still works on it, and "run fna" can read it.
 - Open PDF loads a filled intake PDF back into the app.
+- MyWFG Sheet downloads a typing guide: every MyWFG FNA box, screen by screen, in MyWFG's own words and order (Household Information through Print Options), with the intake answers already turned into what you type. Red means ask the client, gray means leave what MyWFG shows. Labels were read off mywfg.com on 2026-11-27. Not a client document.
 - Clients list. Everything saves in this browser on this device only.
 
 ## Keys
@@ -23,4 +24,6 @@ Edit files in `src/`, then `python3 build.py`. New paper form with the same fiel
 | `src/schema.js` | Field map (state keys are the PDF field names) and the math |
 | `src/capture.js` | The type-what-you-hear parser |
 | `src/fill.js` | Fills and reads the PDF (pdf-lib) |
+| `src/model.js` | Intake to MyWFG case mapping and math (copy of `Paul/fna-report/src/model.js`) |
+| `src/entry.js` | The MyWFG Sheet PDF |
 | `src/app.js`, `src/app.css`, `src/index.src.html` | The screen |

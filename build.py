@@ -60,6 +60,8 @@ def main():
         "SCHEMA": (SRC / "schema.js").read_text(),
         "FILL": (SRC / "fill.js").read_text(),
         "CAPTURE": (SRC / "capture.js").read_text(),
+        "MODEL": (SRC / "model.js").read_text(),
+        "ENTRY": (SRC / "entry.js").read_text(),
         "APP": (SRC / "app.js").read_text(),
     }
     for k, v in parts.items():

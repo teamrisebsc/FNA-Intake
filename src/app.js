@@ -954,6 +954,18 @@
   let growT; window.addEventListener('resize', () => { clearTimeout(growT); growT = setTimeout(() => $$('#main textarea').forEach(grow), 120); });
   $('#dlBtn').addEventListener('click', () => pdfAction('dl'));
   $('#pvBtn').addEventListener('click', () => pdfAction('pv'));
+  // MyWFG Entry Sheet: the same answers, laid out box by box in MyWFG's FNA order
+  $('#entryBtn').addEventListener('click', async () => {
+    if (!(S.PROSPECT || '').trim()) { alert('Add the prospect name first.'); return; }
+    const btn = $('#entryBtn'), old = btn.innerHTML; btn.innerHTML = 'Building&hellip;'; btn.disabled = true;
+    try {
+      const out = await FNAEntry.makeEntryPdf(PDFLib, S, hasSpouse());
+      const url = URL.createObjectURL(new Blob([out], { type: 'application/pdf' }));
+      const a = document.createElement('a'); a.href = url; a.download = fileName().replace(/^FNA Intake/, 'MyWFG Entry'); document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (err) { alert('Could not build the MyWFG sheet: ' + err.message); console.error(err); }
+    btn.innerHTML = old; btn.disabled = false;
+  });
   // hand this client to the FNA Report app (same site, same device storage)
   // Build report is hidden until compliance says how it fits with MyWFG (Edgar, 11/24). The code stays.
   $('#rptBtn').addEventListener('click', () => {
@@ -979,5 +991,5 @@
   // rotating examples in the capture bar
   const ex = ['she takes home 2,100 twice a month', 'his 401k is 85k and he puts in 6%', 'car loan 18k at 6.9%, 420 a month', 'son Leo, 8 years old', 'term plan 500k with State Farm, 45 a month', '5\'10, 185 lbs, nonsmoker', 'expenses about 6,800 a month', 'come back Tuesday at 7pm'];
   let exI = 0; setInterval(() => { const c = $('#cap'); if (c && !c.value && document.activeElement !== c) { exI = (exI + 1) % ex.length; c.placeholder = 'Type in additional details here'; } }, 3800);
-  window.__fna = { get state() { return S; }, capture: (t) => { $('#cap').value = t; capture(); }, makePdf, F };
+  window.__fna = { get state() { return S; }, capture: (t) => { $('#cap').value = t; capture(); }, makePdf, F, entry: () => FNAEntry.makeEntryPdf(PDFLib, S, hasSpouse()) };
 })();
