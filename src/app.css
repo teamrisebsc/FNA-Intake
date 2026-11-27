@@ -505,3 +505,86 @@ a{color:var(--tea);font-weight:600}
 .ev .intros.near{grid-column:1/-1;margin:4px 0 2px}
 .intros[hidden]{display:none}
 .famscript .famhd{padding:11px 16px 6px;font-size:12.5px;font-weight:700;color:var(--tea)}
+
+/* ===================== phone (Coach 11/25, Brilynn 11/27) ===================== */
+/* small labels that only show on a phone, where the column titles are hidden */
+.ml{display:none}
+.acct .cell,.drow,.drow .cell{display:contents}
+.acct{grid-template-columns:58px minmax(0,1.35fr) minmax(0,.62fr) minmax(0,.85fr) minmax(0,.62fr) minmax(0,.85fr)}
+/* yes and no always side by side */
+.ynrow .seg{flex-wrap:nowrap;flex:none}
+/* a name line that just moved to another question */
+.irow.moved{animation:moved 1.6s var(--ease)}
+@keyframes moved{0%,40%{background:rgba(58,166,162,.18);border-radius:12px}100%{background:transparent}}
+/* the near boxes sit under their question already, so no event dropdown there (picking the blank one sent the line away) */
+.intros.near .rmwrap>.in{display:none}
+/* More menu (phone) */
+.more-btn{display:none}
+.moremenu{position:fixed;top:58px;right:12px;z-index:95;min-width:220px;display:flex;flex-direction:column;padding:6px;border-radius:16px;background:#fff;box-shadow:0 0 0 1px rgba(14,90,88,.1),0 30px 60px -20px rgba(14,60,62,.5);transform:translateY(-6px);opacity:0;pointer-events:none;transition:transform .2s var(--ease),opacity .15s}
+.moremenu.on{transform:none;opacity:1;pointer-events:auto}
+.moremenu button{display:flex;align-items:center;gap:12px;height:46px;padding:0 14px;border:0;border-radius:11px;background:transparent;font-size:15px;font-weight:600;color:var(--ink);text-align:left;cursor:pointer}
+.moremenu button:active{background:var(--teabg)}
+.moremenu button svg{width:19px;height:19px;color:var(--tea);flex:none}
+.moremenu .mm-main{background:var(--teaG);color:#fff;margin-bottom:4px}
+.moremenu .mm-main svg{color:#fff}
+
+@media (max-width:600px){
+  /* top bar fits: logo, Clients, More */
+  .top{padding:8px 12px}
+  #findBtn,#mathBtn,#newBtn,#openBtn,#pvBtn,#entryBtn,#dlBtn,#rptBtn{display:none!important}
+  .more-btn{display:inline-flex;color:var(--ink);border:1px solid var(--line);background:#fff;height:38px}
+  #clientsBtn{height:38px}
+  .moremenu{top:56px}
+  /* 16px text so the iPhone does not zoom in when you tap a box */
+  #main input,#main textarea,#main select,.dock input,.pad textarea,.palette input{font-size:16px!important}
+  .shell{padding:12px 10px 150px}
+  /* the type bar and Notes button hide while the keyboard is up, and while Notes is open */
+  body.kb .dock,body.kb .padbtn,body.padon .dock,body.padon .padbtn{display:none}
+  /* Notes: a small round button in the bottom right corner */
+  .padbtn{left:auto;right:14px;bottom:84px;width:50px;height:50px;padding:0;justify-content:center;border-radius:50%;font-size:0;gap:0}
+  .padbtn svg{width:22px;height:22px}
+  .padbtn .dot{position:absolute;top:8px;right:9px}
+  /* Notes opens as a sheet from the bottom, right on top of the keyboard */
+  .pad{left:0;right:0;bottom:var(--kb,0px);width:100%;border-radius:20px 20px 0 0;transform:translateY(24px);box-shadow:0 -20px 50px -20px rgba(14,60,62,.45)}
+  .pad.on{transform:none}
+  .pad textarea{min-height:150px;max-height:38vh;font-size:16px}
+  .pad footer{padding-bottom:max(14px,env(safe-area-inset-bottom))}
+  .pad header .x{width:40px;height:40px;font-size:26px;background:var(--teabg);color:var(--ink)}
+  /* add buttons: the tip goes on its own line */
+  .depfoot{margin-left:0}
+  .depfoot .tip{display:block;margin:6px 0 0!important}
+  /* budget reads like a receipt: words left, amount right */
+  .flow{grid-template-columns:minmax(0,1fr) 132px;gap:10px 12px}
+  .flow>div:not(.lbl):not(.calc){display:none}
+  .flow .calc .t{display:none}
+  /* bigger tap targets */
+  .seg button,.chip{height:40px}
+  .seg.yn button{min-width:56px}
+  .ynrow{gap:12px}
+}
+@container (max-width:560px){
+  /* each retirement account is a small card, every box named */
+  .acct.head{display:none}
+  .acct{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px 10px;padding:12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.6)}
+  .acct+.acct{margin-top:10px}
+  .acct .lab{grid-column:1/-1;font-size:15px;color:var(--ink)}
+  .acct .lab .in input{height:40px}
+  .acct .cell{display:flex;flex-direction:column;gap:4px;min-width:0}
+  .acct .cell.bal{grid-column:1/-1}
+  .acct .in input{height:40px;padding:0 10px}
+  .acct .in.money input{padding-left:22px}
+  .ml{display:block;font-size:12px;font-weight:600;color:var(--mut);line-height:1.2}
+  .acct .lab .ml{margin-bottom:4px}
+  /* each debt is a small card too */
+  .debt{display:flex;flex-direction:column;gap:10px}
+  .debt .hd{display:none}
+  .drow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.6)}
+  .debt [data-xdebt][hidden]{display:none}
+  .drow .cell{display:flex;flex-direction:column;gap:4px;min-width:0}
+  .drow>.dtype,.drow>.fixed{grid-column:1/-1}
+}
+/* on a touch screen the date picker covers the date box: tap anywhere on it */
+@media (pointer:coarse){
+  .in.hascal .calpick{left:0;top:0;right:0;bottom:0;width:100%;height:100%;opacity:0;pointer-events:auto;z-index:2;font-size:16px;-webkit-appearance:none;appearance:none}
+  .in.hascal .calbtn{pointer-events:none}
+}

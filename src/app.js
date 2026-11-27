@@ -11,27 +11,42 @@
   const persist = () => { try { localStorage.setItem(LS, JSON.stringify(DB)); } catch (e) { /* ignore */ } };
   const newId = () => 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const blank = () => ({ DATE: today(), TRAINEE: DB.agent || '', _hasSpouse: true, _log: [], _eduPer: String(DB.eduPer || 100000) });
-  // opening the link always starts a new intake (Edgar, 11/24); saved clients show in the card at the top
-  let CUR = newId();
-  let S = blank();
+  // phone layout: same page, laid out for a small touch screen
+  const PHONE = matchMedia('(max-width: 600px)').matches;
+  const isPhone = () => matchMedia('(max-width: 600px)').matches;
+  // opening the link starts a new intake (Edgar, 11/24), unless one was open in the last 12 hours.
+  // Phones reload a tab after you switch apps, and a fresh blank form looked like the intake was erased (Coach, 11/26).
+  const RESUME_MS = 12 * 3600 * 1000;
+  const lastOpen = DB.current && DB.clients[DB.current];
+  const resumed = !!(lastOpen && Date.now() - (DB.currentAt || lastOpen.updated || 0) < RESUME_MS);
+  let CUR = resumed ? DB.current : newId();
+  let S = resumed ? lastOpen.state : blank();
   let speaker = 'p';
   const hasSpouse = () => S._hasSpouse !== false;
 
-  let saveT;
+  let saveT, dirty = false;
+  function flush() {
+    clearTimeout(saveT);
+    if (!dirty) return;
+    dirty = false;
+    const empty = Object.keys(S).filter((k) => !k.startsWith('_') && S[k] !== '' && S[k] != null && !['DATE', 'TRAINEE'].includes(k)).length === 0;
+    const isNew = !DB.clients[CUR];
+    if (!empty || DB.clients[CUR]) { DB.clients[CUR] = { state: S, updated: Date.now() }; DB.current = CUR; DB.currentAt = Date.now(); }
+    if (S.TRAINEE) DB.agent = S.TRAINEE;
+    if (S._eduPer) DB.eduPer = F.num(S._eduPer);
+    if (!empty) dupCheck(isNew);
+    persist();
+    $('#saveDot').classList.remove('busy');
+  }
   function save() {
     $('#saveDot').classList.add('busy');
+    dirty = true;
     clearTimeout(saveT);
-    saveT = setTimeout(() => {
-      const empty = Object.keys(S).filter((k) => !k.startsWith('_') && S[k] !== '' && S[k] != null && !['DATE', 'TRAINEE'].includes(k)).length === 0;
-      const isNew = !DB.clients[CUR];
-      if (!empty || DB.clients[CUR]) { DB.clients[CUR] = { state: S, updated: Date.now() }; DB.current = CUR; }
-      if (S.TRAINEE) DB.agent = S.TRAINEE;
-      if (S._eduPer) DB.eduPer = F.num(S._eduPer);
-      if (!empty) dupCheck(isNew);
-      persist();
-      $('#saveDot').classList.remove('busy');
-    }, 350);
+    saveT = setTimeout(flush, 350);
   }
+  // save right away when the page is hidden or closed (switching apps on a phone)
+  window.addEventListener('pagehide', flush);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); });
 
   /* ---------- one person, one saved copy ---------- */
   const keyName = (st) => String(st.PROSPECT || '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -69,7 +84,7 @@
     const type = o.type || 'text';
     reg(key, o.reg || o.label, o.who);
     const wrap = type === 'money' ? 'money' : type === 'pct' ? 'pct' : '';
-    const im = ['money', 'num', 'pct'].includes(type) ? ' inputmode="decimal"' : type === 'date' ? ' inputmode="numeric" maxlength="10"' : '';
+    const im = o.im ? ` inputmode="${o.im}"` : ['money', 'num', 'pct'].includes(type) ? ' inputmode="decimal"' : type === 'date' ? ' inputmode="numeric" maxlength="10"' : '';
     const attrs = `data-k="${esc(key)}" data-t="${type}" placeholder="${esc(o.ph || (type === 'date' ? 'MM/DD/YYYY' : ''))}"${im} aria-label="${esc(o.reg || o.label || key)}"`;
     // free text answers wrap and grow as you type; numbers, dates, email stay one line
     const one = !o.area && type === 'text' && !o.short && !o.cal;
@@ -78,6 +93,8 @@
     const box = `<div class="in ${wrap} ${o.cal ? 'hascal' : ''}">${el}${cal}</div>`;
     return o.label ? `<div class="fld ${o.cls || ''}"><label class="${o.ask ? 'ask' : ''}">${o.label}</label>${box}</div>` : box;
   }
+  // a box with its own small label that only shows on a phone (the column titles hide there)
+  const cell = (l, h, cls = '') => `<div class="cell ${cls}"><span class="ml">${l}</span>${h}</div>`;
   // where the names for one introduction question show up, right under that question
   const nearBox = (tag) => `<div class="intros near" data-intro-near="${esc(tag)}" data-noring hidden><div class="hd"></div><div class="hd">Name</div><div class="hd">How they know them</div><div class="hd">Why they came to mind</div><div class="hd">Event</div></div>`;
   // the x on every line an add button made
@@ -177,13 +194,13 @@
       S_('retirement', 'Retirement', () => section('retirement', '04', 'Retirement', 'Retirement <em>goals</em>', `
         ${duo((w) => `
           <div class="qa"><p class="say sm q">At what age would you like to be in a financial position to not have to work a job anymore?</p>${inp(sp(F.RET.age, w), { reg: 'Done working at age', type: 'num', who: w, ph: '60' })}</div>
-          <div class="qa"><p class="say sm q">How much would you want coming in per month in retirement?</p>${inp(sp(F.RET.monthly, w), { reg: 'Wants per month in retirement', type: 'money', who: w })}</div>
+          <div class="qa"><p class="say sm q">How much would you want coming in per month in retirement?</p>${inp(sp(F.RET.monthly, w), { reg: 'Wants per month in retirement', type: 'money', who: w, im: 'text', ph: '10K or 10-15K' })}</div>
           ${Q('Let&rsquo;s look at what you have saved so far... Do you have any current employer retirement accounts?')}
           ${inp(sp(F.RET.employer, w), { label: 'Employer', who: w })}
           <div style="height:10px"></div>
-          <div class="acct"><div class="hd"></div><div class="hd">Balance</div><div class="hd">Contrib %</div><div class="hd">or $</div><div class="hd">Match %</div><div class="hd">or $</div></div>
-          ${F.RET_ROWS.map((r) => `<div class="acct"><div class="lab">${r.type ? inp(sp(r.type, w), { reg: 'Other account type', who: w, ph: 'Type' }) : r.label}</div>
-            ${inp(sp(r.bal, w), { type: 'money', reg: `${r.label} balance`, who: w })}${inp(sp(r.cpct, w), { type: 'pct', reg: `${r.label} contribution %`, who: w })}${inp(sp(r.camt, w), { type: 'money', reg: `${r.label} contribution $`, who: w })}${inp(sp(r.mpct, w), { type: 'pct', reg: `${r.label} employer match %`, who: w })}${inp(sp(r.mamt, w), { type: 'money', reg: `${r.label} employer match $`, who: w })}</div>`).join('')}
+          <div class="acct head"><div class="hd"></div><div class="hd">Balance</div><div class="hd">Contrib %</div><div class="hd">or $</div><div class="hd">Match %</div><div class="hd">or $</div></div>
+          ${F.RET_ROWS.map((r) => `<div class="acct"><div class="lab">${r.type ? `<span class="ml">Other account (IRA, TSP...)</span>${inp(sp(r.type, w), { reg: 'Other account type', who: w, ph: 'Other', short: true })}` : r.label}</div>
+            ${cell('Balance', inp(sp(r.bal, w), { type: 'money', reg: `${r.label} balance`, who: w }), 'bal')}${cell('They put in %', inp(sp(r.cpct, w), { type: 'pct', reg: `${r.label} contribution %`, who: w }))}${cell('or they put in $', inp(sp(r.camt, w), { type: 'money', reg: `${r.label} contribution $`, who: w }))}${cell('Employer match %', inp(sp(r.mpct, w), { type: 'pct', reg: `${r.label} employer match %`, who: w }))}${cell('or employer match $', inp(sp(r.mamt, w), { type: 'money', reg: `${r.label} employer match $`, who: w }))}</div>`).join('')}
           ${Q('Any old retirement accounts?')}
           ${F.RET.old.map((o, i) => `<div class="grid g2" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);margin-bottom:8px">${inp(sp(o.emp, w), { label: i ? '' : 'Former employer', reg: `Old account ${i + 1} employer`, who: w })}${inp(sp(o.bal, w), { label: i ? '' : 'Balance', type: 'money', reg: `Old account ${i + 1} balance`, who: w })}</div>`).join('')}
           ${F.EXTRA_OLD[w].map((x, i) => `<div class="grid g2" data-old="${w}${i}" hidden style="grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);margin-bottom:8px">${inp(x.emp, { reg: `Old account ${x.n} employer`, who: w, ph: 'Former employer' })}<div class="rmwrap">${inp(x.bal, { type: 'money', reg: `Old account ${x.n} balance`, who: w })}${rmBtn('old', w, i, 'Remove this account')}</div></div>`).join('')}
@@ -209,8 +226,8 @@
         <div style="height:18px"></div>
         ${Q('Any debts you&rsquo;re working towards paying off?', '(Mortgage, car loan, student loan, credit cards, personal loans, etc.)')}
         <div class="debt"><div class="hd">Type of debt</div><div class="hd">Balance</div><div class="hd">Interest rate</div><div class="hd">Monthly payment</div>
-        ${F.ALL_DEBTS.map((r, i) => { const a = r.extra ? `data-xdebt="${i - F.DEBT_ROWS.length}"` : ''; const nm = r.type ? 'Debt ' + (i + 1) : 'Mortgage'; const typeBox = r.type ? inp(r.type, { reg: `${nm} type`, ph: ['', 'Car loan', 'Student loan', 'Credit card', 'Personal loan', 'Other'][i] || 'Other' }) : ''; return `${r.type ? `<div ${a}>${r.extra ? `<div class="rmwrap">${typeBox}${rmBtn('debt', '', i - F.DEBT_ROWS.length, 'Remove this debt')}</div>` : typeBox}</div>` : '<div class="fixed">Mortgage</div>'}
-          <div ${a}>${inp(r.bal, { type: 'money', reg: `${nm} balance` })}</div><div ${a}>${inp(r.rate, { type: 'pct', reg: `${nm} interest rate` })}</div><div ${a}>${inp(r.pay, { type: 'money', reg: `${nm} monthly payment` })}</div>`; }).join('')}
+        ${F.ALL_DEBTS.map((r, i) => { const a = r.extra ? `data-xdebt="${i - F.DEBT_ROWS.length}"` : ''; const nm = r.type ? 'Debt ' + (i + 1) : 'Mortgage'; const typeBox = r.type ? inp(r.type, { reg: `${nm} type`, ph: ['', 'Car loan', 'Student loan', 'Credit card', 'Personal loan', 'Other'][i] || 'Other' }) : ''; return `<div class="drow" ${a}>${r.type ? cell('Type of debt', r.extra ? `<div class="rmwrap">${typeBox}${rmBtn('debt', '', i - F.DEBT_ROWS.length, 'Remove this debt')}</div>` : typeBox, 'dtype') : '<div class="fixed">Mortgage</div>'}
+          ${cell('Balance', inp(r.bal, { type: 'money', reg: `${nm} balance` }))}${cell('Interest rate', inp(r.rate, { type: 'pct', reg: `${nm} interest rate` }))}${cell('Per month', inp(r.pay, { type: 'money', reg: `${nm} monthly payment` }))}</div>`; }).join('')}
         </div>
         <div class="depfoot" style="margin-left:0"><button type="button" class="btn sm ghost" id="debtAdd">+ Add another debt</button><span class="tip" style="margin-left:10px">Debts past the 6 lines on the paper print in Notes.</span></div>
         <div class="foot"><div class="m"><span>Total debt</span><b data-m="debtAll"></b></div><div class="m"><span>Debts besides the mortgage</span><b data-c="Text6"></b></div><div class="m"><span>Monthly payments</span><b data-m="debtPay"></b></div></div>`)),
@@ -242,7 +259,7 @@
             <div class="grid g2" style="margin-top:10px">${inp(x.amt, { label: 'Coverage amount', type: 'money', who: w, reg: `Plan ${x.n} coverage` })}${inp(x.company, { label: 'Company', who: w, reg: `Plan ${x.n} company` })}</div>
             <div class="grid g2" style="margin-top:10px">${inp(x.cost, { label: 'Per month', type: 'money', who: w, reg: `Plan ${x.n} monthly cost` })}${inp(x.had, { label: 'Had it how long', who: w, reg: `Plan ${x.n} had it how long` })}</div>
           </div>`).join('')}
-          <div class="depfoot" style="margin-left:0"><button type="button" class="btn sm ghost" data-plan-add="${w}">+ Add another plan</button><span class="tip" style="margin-left:10px">Extra plans count toward Has and print in Notes.</span></div>
+          <div class="depfoot" style="margin-left:0"><button type="button" class="btn sm ghost" data-plan-add="${w}">+ Add another plan</button><span class="tip" style="margin-left:10px">Extra plans add to what they already have and print in Notes.</span></div>
           ${Q('What are your thoughts on the plan you have?', '(Dissatisfied? Who helped them get it?)')}
           ${inp(sp(F.PRO.thoughts[0], w), { area: true, rows: 2, who: w, reg: 'Thoughts on current plan' })}
           <h3>DIME: how much protection is needed</h3>
@@ -273,9 +290,9 @@
           ${inp(sp(F.PRO.meds[0], w), { area: true, rows: 2, who: w, reg: 'Medications and diagnoses' })}
           <div style="margin-top:6px">${yn(sp(F.PRO.smoke[0], w), '&ldquo;Do you smoke?&rdquo;', w)}<div class="yesmore" data-yesmore="${esc(sp(F.PRO.smoke[0], w))}" hidden>${inp('_smokeNote' + w, { label: 'Details', who: w, reg: 'Smoking details', ph: 'What they smoke, how often, when they started or quit' })}</div>${yn(sp(F.PRO.dui[0], w), '&ldquo;Any DUIs in the past 5 years?&rdquo;', w)}<div class="yesmore" data-yesmore="${esc(sp(F.PRO.dui[0], w))}" hidden>${inp('_duiNote' + w, { label: 'Details', who: w, reg: 'DUI details', ph: 'How many, what year, anything still open' })}</div></div>
           <div class="hw" style="margin-top:8px">${inp(sp(F.PRO.ft, w), { label: 'Ft', type: 'num', who: w, reg: 'Height feet' })}${inp(sp(F.PRO.inch, w), { label: 'In', type: 'num', who: w, reg: 'Height inches' })}${inp(sp(F.PRO.wt, w), { label: 'Weight (lbs)', type: 'num', who: w, reg: 'Weight' })}</div>
+          <div class="uw" data-noring><span class="tip">Underwriting guide</span>${seg('_uw' + w, Object.keys(F.UW_GUIDES).map((k) => [k, k]))}<span class="tip" data-uw="${w}"></span></div>
           <div style="margin-top:6px">${yn(sp(F.PRO.ltc[0], w), '&ldquo;Do you have Long-Term Care protection?&rdquo;', w)}</div>
           <div class="grid g2">${inp(sp(F.PRO.ltcCov, w), { label: 'Coverage amount', type: 'money', who: w, reg: 'LTC coverage' })}${inp(sp(F.PRO.ltcPrem, w), { label: 'Premium per month', type: 'money', who: w, reg: 'LTC monthly cost' })}</div>
-          <div class="uw" data-noring><span class="tip">Underwriting guide</span>${seg('_uw' + w, Object.keys(F.UW_GUIDES).map((k) => [k, k]))}<span class="tip" data-uw="${w}"></span></div>
         `))),
 
       S_('expenses', 'Expenses', () => section('expenses', '08', 'Expenses and savings', 'What is <em>left over</em>', `
@@ -304,7 +321,7 @@
         <p class="sentence" data-saving></p>
         <div class="grid g2">${inp(EXP_.sound, { label: 'How does that sound?' })}</div>
 
-        <div class="closer"><div class="tag">The close &middot; ask it every time</div>
+        <div class="closer"><div class="tag">Close with this question</div>
           <p class="say">We are going to take this info and put together a great plan for you. When we get back together, if the plan is better than what you are currently doing, would there be anything stopping you from investing in your future?</p></div>
 
         <div class="subhd"><span>Personal introductions</span></div>
@@ -313,12 +330,12 @@
         <div class="askrow">${say('As we went through this today, who came to mind who should have this same conversation?')}<button type="button" class="btn sm" data-intro-add="Came to mind">+ Name</button></div>
         ${nearBox('Came to mind')}
         <p class="tip" style="margin:-4px 0 14px">No phone numbers yet. No push. You come back to these names at Step 5.</p>
-        ${say('I have a few ideas I would like to run by you. When people have money moving in their life, that is usually when they want someone in their corner. Is it okay if I run a few by you?', true)}
+        ${say('Is it ok if I ask you a few questions to see if maybe someone comes to mind?', true)}
         <p class="tip" data-theirs-tip style="margin:0 0 8px"></p>
         <div class="events">${F.EVENTS.map((e) => `<div class="ev" data-ev="${e.id}"><div class="evtag">${e.tag}<span class="theirs">Their category</span></div><p class="say sm">${e.q}</p><button type="button" class="btn sm" data-intro-add="${esc(e.tag)}">+ Name</button>${nearBox(e.tag)}</div>`).join('')}</div>
         <div class="intros" data-noring>
           <div class="hd"></div><div class="hd">Name</div><div class="hd">How they know them</div><div class="hd">Why they came to mind</div><div class="hd">Event</div>
-          ${F.INTRO_ROWS.map((r, i) => `<div class="irow" data-irow="${i}"><div class="n">${i + 1}</div>${inp(r.name, { reg: `Introduction ${i + 1} name`, ph: 'Name' })}${inp(r.how, { ph: 'Sister, coworker...' })}${inp(r.why, { ph: 'Why them' })}<div class="rmwrap"><div class="in"><select data-k="${esc(r.event)}" aria-label="Introduction ${i + 1} event"><option value=""></option>${['Came to mind', ...F.EVENTS.map((e) => e.tag)].map((t) => `<option>${t}</option>`).join('')}</select></div>${rmBtn('intro', '', i, 'Remove this name')}</div></div>`).join('')}
+          ${F.INTRO_ROWS.map((r, i) => `<div class="irow" data-irow="${i}"><div class="n">${i + 1}</div>${inp(r.name, { reg: `Introduction ${i + 1} name`, ph: 'Name' })}${inp(r.how, { ph: 'Sister, coworker...' })}${inp(r.why, { ph: 'Why them' })}<div class="rmwrap"><div class="in"><select data-k="${esc(r.event)}" aria-label="Introduction ${i + 1} event"><option value="">Pick one</option>${['Came to mind', ...F.EVENTS.map((e) => e.tag)].map((t) => `<option>${t}</option>`).join('')}</select></div>${rmBtn('intro', '', i, 'Remove this name')}</div></div>`).join('')}
         </div>
         <div class="introfoot"><button type="button" class="btn sm ghost" data-intro-add="">+ Add a name</button><span class="tip" data-intro-count></span></div>
         <h3>Business partner</h3>
@@ -328,7 +345,7 @@
 
       S_('return', 'Next meeting', () => section('return', '09', 'Next meeting', 'Back <em>together</em>', `
         <div class="grid retgrid">
-          ${inp(F.RETURN.date[0], { label: 'Return date', type: 'date', cal: true, ph: 'Type or pick' })}${inp(F.RETURN.hour, { label: 'Hour', type: 'num', ph: '7' })}${inp(F.RETURN.min, { label: 'Min', type: 'num', ph: '00' })}
+          ${inp(F.RETURN.date[0], { label: 'Return date', type: 'date', cal: true, ph: PHONE ? 'Tap to pick a date' : 'MM/DD/YYYY' })}${inp(F.RETURN.hour, { label: 'Hour', type: 'num', ph: '7' })}${inp(F.RETURN.min, { label: 'Min', type: 'num', ph: '00' })}
           ${seg(F.RETURN.ampm[0], [['AM', 'AM'], ['PM', 'PM']], { label: '&nbsp;', yn: true, reg: 'AM or PM' })}
           ${(reg(F.RETURN.state, 'Their state'), '')}<div class="fld"><label>Their state</label><div class="in"><input data-k="${esc(F.RETURN.state)}" data-t="state" list="stateList" placeholder="NC or North Carolina" autocomplete="off" spellcheck="false" aria-label="State"></div></div>
         </div>
@@ -433,7 +450,7 @@
     for (const p of [...F.PEOPLE, ...F.EXTRA_DEPS]) {
       const el = $(`[data-k="${CSS.escape(p.age)}"]`); if (!el) continue;
       const a = F.ageFrom(S[p.dob[0]]);
-      el.placeholder = a ? a : ''; el.classList.toggle('has-auto', !!a);
+      el.placeholder = a ? a : 'Age'; el.classList.toggle('has-auto', !!a);
     }
     for (const w of ['p', 's']) {
       const el = $(`[data-k="${CSS.escape(sp(F.PRO.dEdu, w))}"]`);
@@ -839,7 +856,7 @@
   const NOTE = F.NOTES[0];
   const padOn = () => $('#pad').classList.contains('on');
   function padOpen(on) {
-    $('#pad').classList.toggle('on', on); $('#padBtn').classList.toggle('on', on);
+    $('#pad').classList.toggle('on', on); $('#padBtn').classList.toggle('on', on); document.body.classList.toggle('padon', on);
     DB.padOpen = on; persist();
     if (on) { padSync(); setTimeout(() => { const t = $('#padTxt'); t.focus(); t.setSelectionRange(t.value.length, t.value.length); }, 60); }
   }
@@ -880,8 +897,8 @@
   }
   function closeVeil() { $('#veil').classList.remove('on'); $('#drawer').classList.remove('on'); $('#pal').classList.remove('on'); $('#rail').classList.remove('on'); }
   const unfocus = () => { const a = document.activeElement; if (a && a !== document.body && a.blur) a.blur(); };
-  function loadClient(id) { unfocus(); CUR = id; S = DB.clients[id].state; DB.current = id; persist(); paint(); closeVeil(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
-  function newClient() { unfocus(); CUR = newId(); S = blank(); DB.current = null; persist(); paint(); closeVeil(); window.scrollTo({ top: 0, behavior: 'smooth' }); setTimeout(() => $(`[data-k="PROSPECT"]`).focus(), 300); }
+  function loadClient(id) { unfocus(); flush(); CUR = id; S = DB.clients[id].state; DB.current = id; DB.currentAt = Date.now(); persist(); paint(); closeVeil(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  function newClient() { unfocus(); flush(); CUR = newId(); S = blank(); DB.current = null; DB.currentAt = 0; persist(); paint(); closeVeil(); window.scrollTo({ top: 0, behavior: 'smooth' }); setTimeout(() => $(`[data-k="PROSPECT"]`).focus(), 300); }
   document.addEventListener('click', (e) => {
     const o = e.target.closest('[data-open]'), d = e.target.closest('[data-del]');
     if (d) { e.stopPropagation(); const st = DB.clients[d.dataset.del].state; if (confirm(`Delete ${st.PROSPECT || 'this client'} from this device? This cannot be undone.`)) { delete DB.clients[d.dataset.del]; if (d.dataset.del === CUR) { CUR = newId(); S = blank(); paint(); } persist(); openClients(); } return; }
@@ -977,7 +994,7 @@
   $('#padBtn').addEventListener('click', () => padOpen(!padOn()));
   $('#padX').addEventListener('click', () => padOpen(false));
   $('#padGo').addEventListener('click', () => { padOpen(false); jump(NOTE); });
-  if (DB.padOpen) padOpen(true);
+  if (DB.padOpen && !isPhone()) padOpen(true);
   $('#clientsBtn').addEventListener('click', openClients);
   $('#closeDrawer').addEventListener('click', closeVeil);
   $('#veil').addEventListener('click', closeVeil);
@@ -991,5 +1008,49 @@
   // rotating examples in the capture bar
   const ex = ['she takes home 2,100 twice a month', 'his 401k is 85k and he puts in 6%', 'car loan 18k at 6.9%, 420 a month', 'son Leo, 8 years old', 'term plan 500k with State Farm, 45 a month', '5\'10, 185 lbs, nonsmoker', 'expenses about 6,800 a month', 'come back Tuesday at 7pm'];
   let exI = 0; setInterval(() => { const c = $('#cap'); if (c && !c.value && document.activeElement !== c) { exI = (exI + 1) % ex.length; c.placeholder = 'Type in additional details here'; } }, 3800);
+  /* ---------- phone ---------- */
+  // a small note at the top with buttons (not the "Filled in" kind)
+  function notice(title, text, acts, ms) {
+    const el = document.createElement('div');
+    el.className = 'toast';
+    el.innerHTML = `<div class="ttl">${esc(title)}</div><ul><li>${esc(text)}</li></ul><div class="acts">${acts.map((a, i) => `<button class="btn sm ${i ? 'ghost' : ''}" data-i="${i}">${esc(a[0])}</button>`).join('')}</div>`;
+    $('#toasts').appendChild(el);
+    const kill = () => { el.classList.add('out'); setTimeout(() => el.remove(), 360); };
+    el.addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (!b) return; const f = acts[+b.dataset.i][1]; kill(); if (f) f(); });
+    if (ms) setTimeout(kill, ms);
+  }
+  if (resumed && (S.PROSPECT || '').trim()) notice('Picked up where you left off', `${S.PROSPECT.trim()} is open. Everything you typed is here.`, [['Keep going', null], ['Start a new one', newClient]], 9000);
+  // while the keyboard is up, the type bar and the Notes button get out of the way
+  const inForm = (el) => !!(el && el.matches && el.matches('#main input, #main textarea, #main select'));
+  document.addEventListener('focusin', (e) => { if (inForm(e.target)) document.body.classList.add('kb'); });
+  document.addEventListener('focusout', () => setTimeout(() => { if (!inForm(document.activeElement)) document.body.classList.remove('kb'); }, 150));
+  // how much of the screen the keyboard covers, so the Notes sheet sits right on top of it
+  if (window.visualViewport) {
+    const vv = window.visualViewport;
+    const kbFit = () => document.documentElement.style.setProperty('--kb', Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) + 'px');
+    vv.addEventListener('resize', kbFit); vv.addEventListener('scroll', kbFit);
+  }
+  // the date picker sits on top of the date box on a phone: fill it with the date already there before it opens
+  const syncPick = (pick) => { const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(S[pick.dataset.calfor] || ''); pick.value = m ? `${m[3]}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}` : ''; };
+  document.addEventListener('pointerdown', (e) => { const p = e.target.closest && e.target.closest('.calpick'); if (p) syncPick(p); });
+  document.addEventListener('focusin', (e) => { if (e.target.classList && e.target.classList.contains('calpick')) syncPick(e.target); });
+  // a name line that moves to another question: follow it so it never looks gone (Coach, 11/25)
+  document.addEventListener('change', (e) => {
+    const row = e.target.closest && e.target.tagName === 'SELECT' && e.target.closest('[data-irow]'); if (!row) return;
+    setTimeout(() => { row.scrollIntoView({ behavior: 'smooth', block: 'center' }); row.classList.remove('moved'); void row.offsetWidth; row.classList.add('moved'); }, 60);
+  });
+  // More menu: every top button, with words, on a phone
+  const moreMenu = $('#moreMenu'), moreBtn = $('#moreBtn');
+  const moreOpen = (on) => { moreMenu.classList.toggle('on', on); moreBtn.setAttribute('aria-expanded', on ? 'true' : 'false'); };
+  moreBtn.addEventListener('click', (e) => { e.stopPropagation(); moreOpen(!moreMenu.classList.contains('on')); });
+  moreMenu.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-proxy]'); if (!b) return;
+    moreOpen(false);
+    const id = b.dataset.proxy;
+    if (['dlBtn', 'pvBtn', 'entryBtn'].includes(id) && (S.PROSPECT || '').trim()) notice('Building it', id === 'entryBtn' ? 'The MyWFG Sheet downloads in a few seconds.' : 'The PDF opens in a few seconds.', [['OK', null]], 3500);
+    $('#' + id).click();
+  });
+  document.addEventListener('click', (e) => { if (moreMenu.classList.contains('on') && !e.target.closest('#moreMenu')) moreOpen(false); });
+
   window.__fna = { get state() { return S; }, capture: (t) => { $('#cap').value = t; capture(); }, makePdf, F, entry: () => FNAEntry.makeEntryPdf(PDFLib, S, hasSpouse()) };
 })();

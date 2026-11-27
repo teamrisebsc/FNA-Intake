@@ -204,6 +204,9 @@
   const num = (v) => {
     if (v == null || v === '') return 0;
     let s = String(v).trim().toLowerCase().replace(/[$,\s]/g, '');
+    // a range like "10-15K" or "10k to 15k" counts as the low number (Coach, 11/16)
+    const rg = /^(\d*\.?\d+)([km]?)(?:-|to)(\d*\.?\d+)([km]?)$/.exec(s);
+    if (rg) s = rg[1] + (rg[2] || rg[4]);
     let mult = 1;
     if (/k$/.test(s)) { mult = 1e3; s = s.slice(0, -1); } else if (/m$/.test(s)) { mult = 1e6; s = s.slice(0, -1); }
     const n = Number(s);
@@ -436,7 +439,7 @@
     const calc = new Set(Object.keys(compute({})));
     for (const [k, v] of Object.entries(vals)) {
       if (used.has(k) || calc.has(k) || typeof v !== 'string' || !v.trim()) continue;
-      st[k] = MONEY.has(k) ? fmt(num(v)) : v;
+      st[k] = MONEY.has(k) && /^\s*-?\$?\s*[\d,]*\.?\d+\s*[km]?\s*$/i.test(v) ? fmt(num(v)) : v;
     }
     // keep a typed education amount only if it differs from the 100K-per-kid default
     for (const w of ['p', 's']) {
